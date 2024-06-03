@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-use Drupal\rtlbase\Instrumentation\CacheBackendInstrumentation;
-use Drupal\rtlbase\Instrumentation\DatabaseInstrumentation;
-use Drupal\rtlbase\Instrumentation\DrupalKernelInstrumentation;
-use Drupal\rtlbase\Instrumentation\HttpClientCallInstrumentation;
-use Drupal\rtlbase\Instrumentation\HttpClientRequestInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\DatabaseInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\DrupalKernelInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientCallInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientRequestInstrumentation;
 use OpenTelemetry\SDK\Sdk;
 
 if (class_exists(Sdk::class) && Sdk::isInstrumentationDisabled(DrupalKernelInstrumentation::NAME) === TRUE) {
