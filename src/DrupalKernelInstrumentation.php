@@ -111,7 +111,7 @@ class DrupalKernelInstrumentation extends InstrumentationBase{
         $span = $builder
           ->setParent($parent)
           ->setAttribute(TraceAttributes::HTTP_URL, $request->getUri())
-          ->setAttribute(TraceAttributes::HTTP_METHOD, $request->getMethod())
+          ->setAttribute(TraceAttributes::HTTP_REQUEST_METHOD, $request->getMethod())
           ->setAttribute(TraceAttributes::HTTP_REQUEST_CONTENT_LENGTH, $request->headers->get('Content-Length'))
           ->setAttribute(TraceAttributes::HTTP_SCHEME, $request->getScheme())
           ->startSpan();
@@ -162,8 +162,8 @@ class DrupalKernelInstrumentation extends InstrumentationBase{
         $span->setStatus(StatusCode::STATUS_ERROR);
       }
 
-      $span->setAttribute(TraceAttributes::HTTP_STATUS_CODE, $response->getStatusCode());
-      $span->setAttribute(TraceAttributes::HTTP_FLAVOR, $response->getProtocolVersion());
+      $span->setAttribute(TraceAttributes::HTTP_RESPONSE_STATUS_CODE, $response->getStatusCode());
+      $span->setAttribute(TraceAttributes::NETWORK_PROTOCOL_NAME, $response->getProtocolVersion());
       /** @psalm-suppress PossiblyFalseArgument */
       if (is_string($response->getContent())) {
         $contentLength = \strlen($response->getContent());
