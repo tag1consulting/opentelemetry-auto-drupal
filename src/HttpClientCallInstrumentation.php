@@ -46,9 +46,9 @@ class HttpClientCallInstrumentation extends InstrumentationBase{
         ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
         ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
         ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
-        ->setAttribute(TraceAttributes::HTTP_METHOD, $params[0])
-        ->setAttribute(TraceAttributes::HTTP_URL, $params[1])
-        ->setAttribute(TraceAttributes::NET_HOST_NAME, $host)
+        ->setAttribute(TraceAttributes::HTTP_REQUEST_METHOD, $params[0])
+        ->setAttribute(TraceAttributes::URL_FULL, $params[1])
+        ->setAttribute(TraceAttributes::SERVER_ADDRESS, $host)
         ->startSpan();
       Context::storage()
         ->attach($span->storeInContext(Context::getCurrent()));
