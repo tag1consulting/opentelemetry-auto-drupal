@@ -14,7 +14,7 @@ use Throwable;
 
 abstract class InstrumentationBase {
 
-  public const NAME = 'php-fpm';
+  public const NAME = 'drupal';
 
   abstract public static function register(): void;
 
