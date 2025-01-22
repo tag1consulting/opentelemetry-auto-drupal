@@ -8,6 +8,7 @@ use OpenTelemetry\Contrib\Instrumentation\Drupal\DrupalAutoRootSpan;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\DrupalKernelInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientCallInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientRequestInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\ViewsInstrumentation;
 use OpenTelemetry\SDK\Sdk;
 
 if (class_exists(Sdk::class) && Sdk::isInstrumentationDisabled(DrupalKernelInstrumentation::NAME) === TRUE) {
@@ -27,6 +28,7 @@ try {
   EntityInstrumentation::register();
   HttpClientRequestInstrumentation::register();
   HttpClientCallInstrumentation::register();
+  ViewsInstrumentation::register();
 }
 catch (Throwable $exception) {
   \Drupal::logger("drupalInstrumentation")->error($exception->getMessage());
