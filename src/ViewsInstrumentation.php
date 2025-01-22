@@ -66,6 +66,8 @@ class ViewsInstrumentation extends InstrumentationBase {
         ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
         ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
         ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
+        ->setAttribute('drupal.view.name', $name)
+        ->setAttribute('drupal.view.display_id', $display_id)
         ->startSpan();
       Context::storage()
         ->attach($span->storeInContext(Context::getCurrent()));
