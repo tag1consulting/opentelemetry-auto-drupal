@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use OpenTelemetry\Contrib\Instrumentation\Drupal\DatabaseInstrumentation;
+use OpenTelemetry\Contrib\Instrumentation\Drupal\EntityInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\DrupalKernelInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientCallInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientRequestInstrumentation;
@@ -21,6 +22,7 @@ if (extension_loaded('opentelemetry') === FALSE) {
 try {
   DrupalKernelInstrumentation::register();
   DatabaseInstrumentation::register();
+  EntityInstrumentation::register();
   HttpClientRequestInstrumentation::register();
   HttpClientCallInstrumentation::register();
 }
