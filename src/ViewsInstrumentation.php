@@ -17,77 +17,60 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Drupal\views\ViewExecutable;
 
-final class ViewsInstrumentation
-{
-    public const NAME = 'drupal_views';
+class ViewsInstrumentation extends InstrumentationBase {
 
-    public static function register(): void
-    {
-        $instrumentation = new CachedInstrumentation('io.opentelemetry.contrib.php.drupal_views');
+  public static function register(): void {
 
-        hook(
-            ViewExecutable::class,
-            'execute',
-            pre: static function (
-                ViewExecutable $executable,
-                array $params,
-                string $class,
-                string $function,
-                ?string $filename,
-                ?int $lineno,
-            ) use ($instrumentation): array {
-                /** @var string $display_id */
-                $display_id = $params[0];
+    $instrumentation = new CachedInstrumentation('io.opentelemetry.contrib.php.drupal_views');
 
-                $span = "VIEW";
+    hook(
+      ViewExecutable::class,
+      'executeDisplay',
+      static::preClosure($instrumentation),
+      static::postClosure()
+    );
 
-                $storage = $executable->storage;
+  }
 
-                if ($storage) {
-                    $name = $storage->label();
+  /**
+   * @param \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation
+   *
+   * @return \Closure
+   */
+  public static function preClosure(CachedInstrumentation $instrumentation): \Closure {
+    return static function (ViewExecutable $executable, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($instrumentation) {
 
-                    if ($name) {
-                        $span = \sprintf('VIEW %s', $name);
-                    }
-                }
+      $display_id = $params[0];
 
-                /** @psalm-suppress ArgumentTypeCoercion */
-                $builder = $instrumentation
-                    ->tracer()
-                    ->spanBuilder($span)
-                    ->setSpanKind(SpanKind::KIND_INTERNAL)
-                    ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
-                    ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
-                    ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
-                    ->setAttribute(TraceAttributes::CODE_LINENO, $lineno);
+      // Get the name of the view
+      $span = "VIEW";
+      $name = NULL;
 
-                $parent = Context::getCurrent();
-                $span = $builder
-                    ->setParent($parent)
-                    ->startSpan();
+      $storage = $executable->storage;
 
-                $context = $span->storeInContext($parent);
-                Context::storage()->attach($context);
+      if ($storage) {
+        $name = $storage->label();
+      }
 
-                return $params;
-            },
-            post: static function (
-                ViewExecutable $executable,
-                array $params,
-                bool $successful,
-                ?\Throwable $exception
-            ): void {
-                $scope = Context::storage()->scope();
-                if (null === $scope) {
-                    return;
-                }
+      if ($name) {
+        $span .= ' ' . $name;
+      }
 
-                $scope->detach();
+      $parent = Context::getCurrent();
 
-                $span = Span::fromContext($scope->context());
+      /** @var \OpenTelemetry\API\Trace\SpanBuilderInterface $span */
+      $span = $instrumentation->tracer()->spanBuilder($span)
+        ->setParent($parent)
+        ->setSpanKind(SpanKind::KIND_CLIENT)
+        ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
+        ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
+        ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
+        ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
+        ->startSpan();
+      Context::storage()
+        ->attach($span->storeInContext(Context::getCurrent()));
 
-                $span->end();
-            }
-        );
-    }
+      return $params;
+    };
+  }
 }
