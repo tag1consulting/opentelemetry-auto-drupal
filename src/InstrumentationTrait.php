@@ -2,12 +2,13 @@
 
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
-use OpenTelemetry\API\Trace\SpanInterface;
+use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\SemConv\TraceAttributes;
+use function OpenTelemetry\Instrumentation\hook;
 use ReflectionMethod;
 use Throwable;
 
@@ -22,7 +23,7 @@ trait InstrumentationTrait
     ?string $returnValueKey = null
   ): void {
     $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
-    
+
     hook(
       $className,
       $methodName,
@@ -62,7 +63,7 @@ trait InstrumentationTrait
     ) use ($operation, $resolvedParamMap, $instrumentation): void {
       $parent = Context::getCurrent();
       
-      $spanBuilder = $instrumentation->tracer()->spanBuilder($operation)
+      $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
         ->setSpanKind(SpanKind::KIND_CLIENT)
         ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
@@ -101,19 +102,19 @@ trait InstrumentationTrait
       }
 
       $scope->detach();
-      $span = SpanInterface::fromContext($scope->context());
-      
+      $span = Span::fromContext($scope->context());
+
       // Record return value if configured
       if ($resultAttribute !== null) {
         $span->setAttribute(
-          $resultAttribute,
+          'drupal.' . $resultAttribute,
           is_scalar($returnValue) ? $returnValue : json_encode($returnValue)
         );
       }
 
       // Handle exception and status
       if ($exception) {
-        $span->recordException($exception, [TraceAttributes::EXCEPTION_ESCAPED => true]);
+        $span->recordException($exception, [TraceAttributes::EXCEPTION_ESCAPED => TRUE]);
         $span->setStatus(StatusCode::STATUS_ERROR, $exception->getMessage());
       }
 
