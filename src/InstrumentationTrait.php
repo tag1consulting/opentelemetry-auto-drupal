@@ -20,15 +20,16 @@ trait InstrumentationTrait
     string $className,
     string $methodName,
     array $paramMap = [],
-    ?string $returnValueKey = null
+    ?string $returnValueKey = null,
+    ?callable $preHandler = null,
+    ?callable $postHandler = null
   ): void {
     $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
-
     hook(
       $className,
       $methodName,
-      pre: static::preHook("$className::$methodName", $resolvedParamMap),
-      post: static::postHook("$className::$methodName", $returnValueKey)
+      pre: static::preHook("$className::$methodName", $resolvedParamMap, $preHandler),
+      post: static::postHook("$className::$methodName", $returnValueKey, $postHandler)
     );
   }
 
@@ -48,21 +49,20 @@ trait InstrumentationTrait
   }
 
   protected static function preHook(
-    string $operation, 
-    array $resolvedParamMap = []
+    string $operation,
+    array $resolvedParamMap = [],
+    ?callable $customHandler = null
   ): callable {
     $instrumentation = static::getInstrumentation();
-
     return static function (
-      object $object, 
-      array $params, 
-      string $class, 
-      string $function, 
-      ?string $filename, 
+      $object,
+      array $params,
+      string $class,
+      string $function,
+      ?string $filename,
       ?int $lineno
-    ) use ($operation, $resolvedParamMap, $instrumentation): void {
+    ) use ($resolvedParamMap, $customHandler, $instrumentation): void {
       $parent = Context::getCurrent();
-      
       $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
         ->setSpanKind(SpanKind::KIND_CLIENT)
@@ -73,6 +73,7 @@ trait InstrumentationTrait
 
       $spanBuilder->setAttribute('drupal.operation', $operation);
 
+      // Handle standard parameter mapping
       foreach ($resolvedParamMap as $attributeName => $position) {
         if (isset($params[$position])) {
           $value = $params[$position];
@@ -83,19 +84,27 @@ trait InstrumentationTrait
         }
       }
 
+      // Execute custom handler if provided, passing spanBuilder
+      if ($customHandler !== null) {
+        $customHandler($spanBuilder, $object, $params, $class, $function, $filename, $lineno);
+      }
+
       $span = $spanBuilder->startSpan();
       Context::storage()->attach($span->storeInContext($parent));
     };
   }
 
-  protected static function postHook(string $operation, ?string $resultAttribute = null): callable
-  {
+  protected static function postHook(
+    string $operation,
+    ?string $resultAttribute = null,
+    ?callable $customHandler = null
+  ): callable {
     return static function (
-      object $object,
+      $object,
       array $params,
-      mixed $returnValue,
+      $returnValue,
       ?Throwable $exception
-    ) use ($resultAttribute): void {
+    ) use ($operation, $resultAttribute, $customHandler): void {
       $scope = Context::storage()->scope();
       if (!$scope) {
         return;
@@ -104,7 +113,7 @@ trait InstrumentationTrait
       $scope->detach();
       $span = Span::fromContext($scope->context());
 
-      // Record return value if configured
+      // Handle standard return value mapping
       if ($resultAttribute !== null) {
         $span->setAttribute(
           'drupal.' . $resultAttribute,
@@ -112,10 +121,15 @@ trait InstrumentationTrait
         );
       }
 
-      // Handle exception and status
+      // Handle exception and status first
       if ($exception) {
         $span->recordException($exception, [TraceAttributes::EXCEPTION_ESCAPED => TRUE]);
         $span->setStatus(StatusCode::STATUS_ERROR, $exception->getMessage());
+      }
+
+      // Execute custom handler if provided, passing span
+      if ($customHandler !== null) {
+        $customHandler($span, $object, $params, $returnValue, $exception);
       }
 
       $span->end();
@@ -142,7 +156,6 @@ trait InstrumentationTrait
         }
       }
     }
-
     return $resolvedMap;
   }
 }
