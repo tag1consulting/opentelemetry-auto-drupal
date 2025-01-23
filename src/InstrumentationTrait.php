@@ -141,6 +141,10 @@ trait InstrumentationTrait
     string $methodName,
     array $paramMap
   ): array {
+    if (empty($paramMap)) {
+      return [];
+    }
+
     $reflection = new ReflectionMethod($className, $methodName);
     $parameters = $reflection->getParameters();
     $resolvedMap = [];
