@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use OpenTelemetry\Contrib\Instrumentation\Drupal\CacheBackendInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\DatabaseInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\EntityInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\DrupalAutoRootSpan;
@@ -22,6 +23,7 @@ if (extension_loaded('opentelemetry') === FALSE) {
 }
 
 try {
+  CacheBackendInstrumentation::register();
   DrupalAutoRootSpan::register();
   DrupalKernelInstrumentation::register();
   DatabaseInstrumentation::register();
