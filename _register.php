@@ -33,6 +33,7 @@ try {
   ViewsInstrumentation::register();
 }
 catch (Throwable $exception) {
-  \Drupal::logger("drupalInstrumentation")->error($exception->getMessage());
-  return;
+  throw $exception;
+  //\Drupal::logger("drupalInstrumentation")->error($exception->getMessage());
+  //return;
 }
