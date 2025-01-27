@@ -1,87 +1,102 @@
 <?php
-
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\Cache\CacheBackendInterface;
 
-require_once __DIR__ . '/../opentelemery-php-instrumentation-trait/src/InstrumentationTrait.php';
-use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
+class CacheBackendInstrumentation extends InstrumentationBase2 {
+    protected const CLASSNAME = CacheBackendInterface::class;
 
-class CacheBackendInstrumentation {
-  use InstrumentationTrait;
+    protected static array $cacheBins = [];
 
-  protected const CLASSNAME = CacheBackendInterface::class;
+    public static function register(): void {
+        static::initialize(name: 'io.opentelemetry.contrib.php.drupal', prefix: 'drupal.cache');
 
-  public static function register(): void {
-    static::initialize(name: 'io.opentelemetry.contrib.php.drupal', prefix: 'drupal.cache');
+        // Capture bin name in constructor
+        static::helperHook(
+            self::CLASSNAME,
+            '__construct',
+            preHandler: function($spanBuilder, $object, array $params, string $class) {
+                // Get actual constructor parameters at runtime
+                $reflection = new \ReflectionClass($class);
+                $constructor = $reflection->getConstructor();
+                if (!$constructor) {
+                    return;
+                }
 
-    // Get single item - track hits/misses
-    static::helperHook(
-      self::CLASSNAME,
-      'get',
-      ['cid', 'allowInvalid'],
-      null,
-      postHandler: function($span, $object, array $params, $returnValue) {
-        $span->setAttribute(static::getAttributeName('hit'), $returnValue !== FALSE);
-        $span->setAttribute(static::getAttributeName('valid'), !empty($returnValue->valid));
-      }
-    );
+                foreach ($constructor->getParameters() as $position => $parameter) {
+                    if ($parameter->getName() === 'bin' && isset($params[$position])) {
+                        $bin = $params[$position];
+                        $spanBuilder->setAttribute(static::getAttributeName('bin'), $bin);
+                        static::$cacheBins[spl_object_id($object)] = $bin;
+                        break;
+                    }
+                }
+            }
+        );
 
-    // Get multiple items - track hit ratio
-    static::helperHook(
-      self::CLASSNAME,
-      'getMultiple',
-      ['cids'],
-      null,
-      postHandler: function($span, $object, array $params, $returnValue) {
-        $missCount = count($params[0]);
-        $hitCount = count($returnValue);
-        $total = $missCount + $hitCount;
+        // Define operations
+        $operations = [
+            'get' => [
+                'params' => ['cid' => 'cache_key'],
+                'postHandler' => function($span, $object, array $namedParams, $returnValue) {
+                    $span->setAttribute(static::getAttributeName('hit'), $returnValue !== FALSE);
+                    $span->setAttribute(static::getAttributeName('valid'), !empty($returnValue->valid));
+                }
+            ],
+            'getMultiple' => [
+                'params' => ['cids' => 'cache_keys'],
+                'postHandler' => function($span, $object, array $namedParams, $returnValue) {
+                    $missCount = count($namedParams['cids']);
+                    $hitCount = count($returnValue);
+                    $total = $missCount + $hitCount;
 
-        $span->setAttribute(static::getAttributeName('hit_count'), $hitCount);
-        $span->setAttribute(static::getAttributeName('miss_count'), $missCount);
-        $span->setAttribute(static::getAttributeName('hit_ratio'), $total > 0 ? $hitCount / $total : 0);
-      }
-    );
+                    $span->setAttribute(static::getAttributeName('hit_count'), $hitCount);
+                    $span->setAttribute(static::getAttributeName('miss_count'), $missCount);
+                    $span->setAttribute(static::getAttributeName('hit_ratio'), $total > 0 ? $hitCount / $total : 0);
+                }
+            ],
+            'set' => [
+                'params' => ['cid' => 'cache_key', 'tags'],
+                'preHandler' => function($spanBuilder, $object, array $namedParams) {
+                    $spanBuilder->setAttribute(static::getAttributeName('ttl'), isset($namedParams['expire']) ? $namedParams['expire'] : -1);
+                    $spanBuilder->setAttribute(static::getAttributeName('tag_count'), count($namedParams['tags'] ?? []));
+                }
+            ],
+            'deleteMultiple' => [
+                'params' => ['cids' => 'cache_keys'],
+                'preHandler' => function($spanBuilder, $object, array $namedParams) {
+                    $spanBuilder->setAttribute(static::getAttributeName('delete_count'), count($namedParams['cids']));
+                }
+            ],
+            'invalidateMultiple' => [
+                'params' => ['cids' => 'cache_keys'],
+                'preHandler' => function($spanBuilder, $object, array $namedParams) {
+                    $spanBuilder->setAttribute(static::getAttributeName('invalidate_count'), count($namedParams['cids']));
+                }
+            ],
+            'delete' => [
+                'params' => ['cid' => 'cache_key']
+            ],
+            'invalidate' => [
+                'params' => ['cid' => 'cache_key']
+            ],
+            'deleteAll' => [],
+            'invalidateAll' => [],
+            'removeBin' => []
+        ];
 
-    // Set - track TTL and tags
-    static::helperHook(
-      self::CLASSNAME,
-      'set',
-      ['cid', 'ttl', 'tags'],
-      null,
-      preHandler: function($spanBuilder, $object, array $params) {
-        $spanBuilder->setAttribute(static::getAttributeName('tag_count'), count($params[3] ?? []));
-      }
-    );
+        // Common handler for adding bin information
+        $binHandler = function($spanBuilder, $object) {
+            $objectId = spl_object_id($object);
+            $bin = static::$cacheBins[$objectId] ?? 'unknown';
+            $spanBuilder->setAttribute(static::getAttributeName('bin'), $bin); 
+        };
 
-    // Delete operations - track counts
-    static::helperHook(
-      self::CLASSNAME,
-      'deleteMultiple',
-      ['cids'],
-      null,
-      preHandler: function($spanBuilder, $object, array $params) {
-        $spanBuilder->setAttribute(static::getAttributeName('delete_count'), count($params[0]));
-      }
-    );
-
-    // Invalidate operations - track counts
-    static::helperHook(
-      self::CLASSNAME,
-      'invalidateMultiple',
-      ['cids'],
-      null,
-      preHandler: function($spanBuilder, $object, array $params) {
-        $spanBuilder->setAttribute(static::getAttributeName('invalidate_count'), count($params[0]));
-      }
-    );
-
-    // Simple operations without additional attributes
-    static::helperHook(self::CLASSNAME, 'delete', ['cid']);
-    static::helperHook(self::CLASSNAME, 'invalidate', ['cid']);
-    static::helperHook(self::CLASSNAME, 'deleteAll');
-    static::helperHook(self::CLASSNAME, 'invalidateAll');
-    static::helperHook(self::CLASSNAME, 'removeBin');
-  }
+        // Register all operations with common bin handling
+        static::registerOperations(
+            operations: $operations,
+            className: self::CLASSNAME,
+            commonPreHandler: $binHandler
+        );
+    }
 }
