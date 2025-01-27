@@ -15,74 +15,73 @@ class CacheBackendInstrumentation {
   public static function register(): void {
     static::initialize(name: 'io.opentelemetry.contrib.php.drupal', prefix: 'drupal.cache');
 
+    // Get single item - track hits/misses
     static::helperHook(
       self::CLASSNAME,
       'get',
-      ['cid'],
-      'returnValue'
+      ['cid', 'allowInvalid'],
+      null,
+      postHandler: function($span, $object, array $params, $returnValue) {
+        $span->setAttribute(static::getAttributeName('hit'), $returnValue !== FALSE);
+        $span->setAttribute(static::getAttributeName('valid'), !empty($returnValue->valid));
+      }
     );
 
+    // Get multiple items - track hit ratio
     static::helperHook(
       self::CLASSNAME,
       'getMultiple',
-      ['cids' => 'cacheIds'],
-      'returnValue'
+      ['cids'],
+      null,
+      postHandler: function($span, $object, array $params, $returnValue) {
+        $missCount = count($params[0]);
+        $hitCount = count($returnValue);
+        $total = $missCount + $hitCount;
+
+        $span->setAttribute(static::getAttributeName('hit_count'), $hitCount);
+        $span->setAttribute(static::getAttributeName('miss_count'), $missCount);
+        $span->setAttribute(static::getAttributeName('hit_ratio'), $total > 0 ? $hitCount / $total : 0);
+      }
     );
 
+    // Set - track TTL and tags
     static::helperHook(
       self::CLASSNAME,
       'set',
-      ['cid', 'data', 'expire', 'tags'],
-      'returnValue'
+      ['cid', 'ttl', 'tags'],
+      null,
+      preHandler: function($spanBuilder, $object, array $params) {
+        $spanBuilder->setAttribute(static::getAttributeName('tag_count'), count($params[3] ?? []));
+      }
     );
 
-    static::helperHook(
-      self::CLASSNAME,
-      'delete',
-      ['cid'],
-      'returnValue'
-    );
-
+    // Delete operations - track counts
     static::helperHook(
       self::CLASSNAME,
       'deleteMultiple',
       ['cids'],
-      'returnValue'
+      null,
+      preHandler: function($spanBuilder, $object, array $params) {
+        $spanBuilder->setAttribute(static::getAttributeName('delete_count'), count($params[0]));
+      }
     );
 
-    static::helperHook(
-      self::CLASSNAME,
-      'deleteAll',
-      [],
-      'returnValue'
-    );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'invalidate',
-      ['cid'],
-      'returnValue'
-    );
-
+    // Invalidate operations - track counts
     static::helperHook(
       self::CLASSNAME,
       'invalidateMultiple',
       ['cids'],
-      'returnValue'
+      null,
+      preHandler: function($spanBuilder, $object, array $params) {
+        $spanBuilder->setAttribute(static::getAttributeName('invalidate_count'), count($params[0]));
+      }
     );
 
-    static::helperHook(
-      self::CLASSNAME,
-      'invalidateAll',
-      [],
-      'returnValue'
-    );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'removeBin',
-      [],
-      'returnValue'
-    );
+    // Simple operations without additional attributes
+    static::helperHook(self::CLASSNAME, 'delete', ['cid']);
+    static::helperHook(self::CLASSNAME, 'invalidate', ['cid']);
+    static::helperHook(self::CLASSNAME, 'deleteAll');
+    static::helperHook(self::CLASSNAME, 'invalidateAll');
+    static::helperHook(self::CLASSNAME, 'removeBin');
   }
 }
