@@ -85,18 +85,17 @@ abstract class InstrumentationBase2 {
      *                             'returnValue' => string|null
      *                           ]
      *                         ]
-     * @param string $className The class to instrument
      * @param callable|null $commonPreHandler Handler applied before all operations
      * @param callable|null $commonPostHandler Handler applied after all operations
+     * @return $this
      */
-    protected static function registerOperations(
+    protected function registerOperations(
         array $operations,
-        string $className,
         ?callable $commonPreHandler = null,
         ?callable $commonPostHandler = null
-    ): void {
+    ): self {
         foreach ($operations as $method => $config) {
-            $parameterPositions = static::resolveMethodParameters($className, $method);
+            $parameterPositions = static::resolveMethodParameters($this->className, $method);
             $converter = static::createNamedParamsConverter($parameterPositions);
 
             $preHandler = isset($config['preHandler']) || $commonPreHandler ?
@@ -113,14 +112,15 @@ abstract class InstrumentationBase2 {
                     $commonPostHandler ?? function() {}
                 ) : null;
 
-            static::helperHook(
-                $className,
-                $method,
-                $config['params'] ?? [],
-                $config['returnValue'] ?? null,
+            $this->helperHook(
+                methodName: $method,
+                paramMap: $config['params'] ?? [],
+                returnValueKey: $config['returnValue'] ?? null,
                 preHandler: $preHandler,
                 postHandler: $postHandler
             );
         }
+
+        return $this;
     }
 }
