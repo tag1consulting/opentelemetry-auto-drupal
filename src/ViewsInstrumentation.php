@@ -36,7 +36,6 @@ class ViewsInstrumentation extends InstrumentationBase2 {
           }
 
           $spanBuilder->setName($spanName);
-          $spanBuilder->setSpanKind(SpanKind::KIND_CLIENT);
           $spanBuilder->setAttribute($this->getAttributeName('name'), $name);
           $spanBuilder->setAttribute($this->getAttributeName('display_id'), $display_id);
         }
