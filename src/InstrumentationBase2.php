@@ -5,7 +5,23 @@ require_once __DIR__ . '/../opentelemery-php-instrumentation-trait/src/Instrumen
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
 abstract class InstrumentationBase2 {
-    use InstrumentationTrait;
+    use InstrumentationTrait {
+      create as protected createClass;
+    }
+
+    /**
+     * Creates and initializes the instrumentation.
+     */
+    protected static function create(string $name, string $prefix, string $className): static {
+        $instance = static::createClass(name: $name, prefix: $prefix, className: $className);
+        $instance->registerInstrumentation();
+        return $instance;
+    }
+
+    /**
+     * Register the specific instrumentation logic.
+     */
+    abstract protected function registerInstrumentation(): void;
 
     /**
      * Resolves parameter information for a given method using reflection.
