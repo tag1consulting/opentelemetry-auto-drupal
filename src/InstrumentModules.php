@@ -1,17 +1,22 @@
 <?php
+
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\DrupalKernel;
 
+/**
+ *
+ */
 class InstrumentModules extends InstrumentationBase {
   protected const CLASSNAME = DrupalKernel::class;
   private static array $moduleInstrumentations = [];
-  private static bool $isRegistered = false;
+  private static bool $isRegistered = FALSE;
 
   /**
    * Register a module-based instrumentation class.
    *
-   * @param string $instrumentationClass The fully qualified class name of the instrumentation
+   * @param string $instrumentationClass
+   *   The fully qualified class name of the instrumentation.
    */
   public static function registerModule(string $instrumentationClass): void {
     if (!is_subclass_of($instrumentationClass, InstrumentationBase::class)) {
@@ -24,8 +29,11 @@ class InstrumentModules extends InstrumentationBase {
     static::register();
   }
 
+  /**
+   *
+   */
   public static function register(): void {
-    // Register the kernel hook if not already done
+    // Register the kernel hook if not already done.
     if (static::$isRegistered) {
       return;
     }
@@ -35,20 +43,24 @@ class InstrumentModules extends InstrumentationBase {
       prefix: 'drupal.modules',
       className: static::CLASSNAME
     );
-    static::$isRegistered = true;
+    static::$isRegistered = TRUE;
   }
 
+  /**
+   *
+   */
   protected function registerInstrumentation(): void {
-    // Hook into container initialization
+    // Hook into container initialization.
     $this->helperHook(
       methodName: 'initializeContainer',
-      postHandler: function($span, $object) {
-        // Register all collected module instrumentations
+      postHandler: function ($span, $object) {
+        // Register all collected module instrumentations.
         foreach (static::$moduleInstrumentations as $instrumentationClass) {
           try {
             $instrumentationClass::register();
-          } catch (\Throwable $e) {
-            // Optionally log the error or handle it as needed
+          }
+          catch (\Throwable $e) {
+            // Optionally log the error or handle it as needed.
             error_log(sprintf(
               'Failed to register module instrumentation %s: %s',
               $instrumentationClass,
@@ -59,4 +71,5 @@ class InstrumentModules extends InstrumentationBase {
       }
     );
   }
+
 }

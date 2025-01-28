@@ -4,12 +4,16 @@ namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\DrupalKernel;
 use OpenTelemetry\SDK\Trace\AutoRootSpan;
-use OpenTelemetry\Context\Context;
-use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
 
+/**
+ *
+ */
 class DrupalAutoRootSpan {
 
+  /**
+   *
+   */
   public static function register(): void {
 
     hook(

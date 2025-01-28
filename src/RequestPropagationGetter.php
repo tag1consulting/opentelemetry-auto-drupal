@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
-use InvalidArgumentException;
 use OpenTelemetry\Context\Propagation\PropagationGetterInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -13,6 +12,9 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class RequestPropagationGetter implements PropagationGetterInterface {
 
+  /**
+   *
+   */
   public static function instance(): self {
     static $instance;
 
@@ -27,7 +29,7 @@ final class RequestPropagationGetter implements PropagationGetterInterface {
       return $carrier->headers->keys();
     }
 
-    throw new InvalidArgumentException(
+    throw new \InvalidArgumentException(
       sprintf(
         'Unsupported carrier type: %s.',
         is_object($carrier) ? get_class($carrier) : gettype($carrier),
@@ -35,12 +37,15 @@ final class RequestPropagationGetter implements PropagationGetterInterface {
     );
   }
 
+  /**
+   *
+   */
   public function get($carrier, string $key) : ?string {
     if ($this->isSupportedCarrier($carrier)) {
       return $carrier->headers->get($key);
     }
 
-    throw new InvalidArgumentException(
+    throw new \InvalidArgumentException(
       sprintf(
         'Unsupported carrier type: %s. Unable to get value associated with key:%s',
         is_object($carrier) ? get_class($carrier) : gettype($carrier),
@@ -49,6 +54,9 @@ final class RequestPropagationGetter implements PropagationGetterInterface {
     );
   }
 
+  /**
+   *
+   */
   private function isSupportedCarrier($carrier): bool {
     return $carrier instanceof Request;
   }
