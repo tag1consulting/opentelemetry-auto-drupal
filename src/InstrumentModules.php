@@ -3,7 +3,7 @@ namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\DrupalKernel;
 
-class InstrumentModules extends InstrumentationBase2 {
+class InstrumentModules extends InstrumentationBase {
   protected const CLASSNAME = DrupalKernel::class;
   private static array $moduleInstrumentations = [];
   private static bool $isRegistered = false;
@@ -14,9 +14,9 @@ class InstrumentModules extends InstrumentationBase2 {
    * @param string $instrumentationClass The fully qualified class name of the instrumentation
    */
   public static function registerModule(string $instrumentationClass): void {
-    if (!is_subclass_of($instrumentationClass, InstrumentationBase2::class)) {
+    if (!is_subclass_of($instrumentationClass, InstrumentationBase::class)) {
       throw new \InvalidArgumentException(
-        "Instrumentation class must extend InstrumentationBase2"
+        "Instrumentation class must extend InstrumentationBase"
       );
     }
 
