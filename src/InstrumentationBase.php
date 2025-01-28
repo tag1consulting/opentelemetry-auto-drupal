@@ -50,16 +50,21 @@ abstract class InstrumentationBase {
      * Creates a converter function that transforms positional parameters to named parameters.
      *
      * This helper creates a closure that can convert an array of positional arguments
-     * into an associative array of named parameters based on the parameter mapping
-     * created by resolveMethodParameters().
+     * into an associative array that maintains both numeric indexes and named parameters.
+     * This allows for flexible parameter access either by position or name.
+     *
+     * Example:
+     * Input: [0 => 'value1', 1 => 'value2']
+     * Parameter positions: ['name1' => 0, 'name2' => 1]
+     * Output: [0 => 'value1', 1 => 'value2', 'name1' => 'value1', 'name2' => 'value2']
      *
      * @param array<string, int> $parameterPositions Parameter name to position mapping
-     * @return callable Function that converts positional to named parameters
+     * @return callable Function that converts positional to named parameters while preserving numeric indexes
      *                 Signature: function(array $params): array
      */
     protected static function createNamedParamsConverter(array $parameterPositions): callable {
         return function(array $params) use ($parameterPositions): array {
-            $namedParams = [];
+            $namedParams = $params;
             foreach ($parameterPositions as $name => $position) {
                 if (isset($params[$position])) {
                     $namedParams[$name] = $params[$position];
