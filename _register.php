@@ -11,6 +11,8 @@ use OpenTelemetry\Contrib\Instrumentation\Drupal\InstrumentModules;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientCallInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\HttpClientRequestInstrumentation;
 use OpenTelemetry\Contrib\Instrumentation\Drupal\ViewsInstrumentation;
+use OpenTelemetry\Context\Context;
+use OpenTelemetry\Context\ContextStorage;
 use OpenTelemetry\SDK\Sdk;
 
 if (class_exists(Sdk::class) && Sdk::isInstrumentationDisabled(DrupalKernelInstrumentation::NAME) === TRUE) {
@@ -22,6 +24,13 @@ if (extension_loaded('opentelemetry') === FALSE) {
 
   return;
 }
+
+// Force disable the FiberBoundContextStorage because of the conflict
+// with Drupal Renderer service.
+// @see https://www.drupal.org/project/opentelemetry/issues/3488173
+// @todo Make a proper fix to work well with the FiberBoundContextStorage.
+$contextStorage = new ContextStorage();
+Context::setStorage($contextStorage);
 
 try {
   CacheBackendInstrumentation::register();
