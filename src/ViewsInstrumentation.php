@@ -4,75 +4,45 @@ declare(strict_types=1);
 
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
-use OpenTelemetry\API\Globals;
-use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
-use OpenTelemetry\API\Trace\Span;
-use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\SpanKind;
-use OpenTelemetry\API\Trace\StatusCode;
-use OpenTelemetry\Context\Context;
-use function OpenTelemetry\Instrumentation\hook;
 use OpenTelemetry\SemConv\TraceAttributes;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Drupal\views\ViewExecutable;
 
-class ViewsInstrumentation extends InstrumentationBase {
+class ViewsInstrumentation extends InstrumentationBase2 {
+  protected const CLASSNAME = ViewExecutable::class;
 
   public static function register(): void {
-
-    $instrumentation = new CachedInstrumentation('io.opentelemetry.contrib.php.drupal_views');
-
-    hook(
-      ViewExecutable::class,
-      'executeDisplay',
-      static::preClosure($instrumentation),
-      static::postClosure()
+    static::create(
+      name: 'io.opentelemetry.contrib.php.drupal_views',
+      prefix: 'drupal.view',
+      className: static::CLASSNAME
     );
-
   }
 
-  /**
-   * @param \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation
-   *
-   * @return \Closure
-   */
-  public static function preClosure(CachedInstrumentation $instrumentation): \Closure {
-    return static function (ViewExecutable $executable, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($instrumentation) {
+  protected function registerInstrumentation(): void {
+    $operations = [
+      'executeDisplay' => [
+        'preHandler' => function($spanBuilder, ViewExecutable $executable, array $namedParams) {
+          $display_id = $namedParams['display_id'] ?? null;
+          $name = null;
+          
+          if ($executable->storage) {
+            $name = $executable->storage->label();
+          }
 
-      $display_id = $params[0];
+          $spanName = 'VIEW';
+          if ($name) {
+            $spanName .= ' ' . $name;
+          }
 
-      // Get the name of the view
-      $span = "VIEW";
-      $name = NULL;
+          $spanBuilder->setName($spanName);
+          $spanBuilder->setSpanKind(SpanKind::KIND_CLIENT);
+          $spanBuilder->setAttribute($this->getAttributeName('name'), $name);
+          $spanBuilder->setAttribute($this->getAttributeName('display_id'), $display_id);
+        }
+      ]
+    ];
 
-      $storage = $executable->storage;
-
-      if ($storage) {
-        $name = $storage->label();
-      }
-
-      if ($name) {
-        $span .= ' ' . $name;
-      }
-
-      $parent = Context::getCurrent();
-
-      /** @var \OpenTelemetry\API\Trace\SpanBuilderInterface $span */
-      $span = $instrumentation->tracer()->spanBuilder($span)
-        ->setParent($parent)
-        ->setSpanKind(SpanKind::KIND_CLIENT)
-        ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
-        ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
-        ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
-        ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
-        ->setAttribute('drupal.view.name', $name)
-        ->setAttribute('drupal.view.display_id', $display_id)
-        ->startSpan();
-      Context::storage()
-        ->attach($span->storeInContext(Context::getCurrent()));
-
-      return $params;
-    };
+    $this->registerOperations($operations);
   }
 }
