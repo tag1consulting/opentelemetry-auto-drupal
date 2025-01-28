@@ -30,7 +30,6 @@ class HttpClientCallInstrumentation extends InstrumentationBase {
   protected function registerInstrumentation(): void {
     $this->helperHook(
       methodName: '__call',
-      paramMap: [],
       preHandler: function ($spanBuilder, $object, array $params) {
         $url = is_array($params[1]) ? $params[1][0] ?? NULL : $params[1];
 

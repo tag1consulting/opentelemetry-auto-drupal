@@ -6,8 +6,6 @@ namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
-use OpenTelemetry\API\Trace\SpanKind;
-use OpenTelemetry\SemConv\TraceAttributes;
 
 /**
  *
@@ -71,4 +69,5 @@ final class EntityInstrumentation extends InstrumentationBase {
 
     $this->registerOperations($operations);
   }
+
 }

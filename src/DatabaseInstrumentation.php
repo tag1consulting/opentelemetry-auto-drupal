@@ -30,7 +30,6 @@ class DatabaseInstrumentation extends InstrumentationBase {
   protected function registerInstrumentation(): void {
     $operations = [
       'query' => [
-        'params' => [],
         'preHandler' => function ($spanBuilder, $object, array $namedParams) {
           $spanBuilder
             ->setSpanKind(SpanKind::KIND_CLIENT)
