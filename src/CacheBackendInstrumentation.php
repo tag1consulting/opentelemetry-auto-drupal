@@ -5,16 +5,18 @@ use Drupal\Core\Cache\CacheBackendInterface;
 
 class CacheBackendInstrumentation extends InstrumentationBase2 {
     protected const CLASSNAME = CacheBackendInterface::class;
-
     protected static array $cacheBins = [];
 
     public static function register(): void {
-        static::initialize(name: 'io.opentelemetry.contrib.php.drupal', prefix: 'drupal.cache');
+        $instance = self::create(
+            name: 'io.opentelemetry.contrib.php.drupal',
+            prefix: 'drupal.cache',
+            className: self::CLASSNAME
+        );
 
         // Capture bin name in constructor
-        static::helperHook(
-            self::CLASSNAME,
-            '__construct',
+        $instance->helperHook(
+            methodName: '__construct',
             preHandler: function($spanBuilder, $object, array $params, string $class) {
                 // Get actual constructor parameters at runtime
                 $reflection = new \ReflectionClass($class);
@@ -93,9 +95,8 @@ class CacheBackendInstrumentation extends InstrumentationBase2 {
         };
 
         // Register all operations with common bin handling
-        static::registerOperations(
+        $instance->registerOperations(
             operations: $operations,
-            className: self::CLASSNAME,
             commonPreHandler: $binHandler
         );
     }
