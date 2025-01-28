@@ -29,7 +29,7 @@ final class EntityInstrumentation extends InstrumentationBase
       'save' => [
         'preHandler' => function($spanBuilder, $storage, array $namedParams) {
           /** @var \Drupal\Core\Entity\EntityInterface $entity */
-          $entity = $namedParams[0];
+          $entity = $namedParams['entity'];
           $span = sprintf('Entity save (%s:%s)', $entity->getEntityTypeId(), $entity->isNew() ? 'new' : $entity->id());
 
           $spanBuilder->setName($span)
@@ -44,7 +44,7 @@ final class EntityInstrumentation extends InstrumentationBase
       'delete' => [
         'preHandler' => function($spanBuilder, $storage, array $namedParams) {
           /** @var \Drupal\Core\Entity\EntityInterface[] $entities */
-          $entities = $namedParams[0];
+          $entities = $namedParams['entities'];
           if (count($entities) === 0) {
             return;
           }
