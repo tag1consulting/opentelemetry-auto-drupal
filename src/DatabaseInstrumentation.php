@@ -24,13 +24,19 @@ class DatabaseInstrumentation extends InstrumentationBase {
     );
   }
 
+  protected bool $inQuery = FALSE;
+
   /**
    *
    */
   protected function registerInstrumentation(): void {
     $operations = [
       'query' => [
-        'preHandler' => function ($spanBuilder, $object, array $namedParams) {
+        'preHandler' => function ($spanBuilder, Connection $connection, array $namedParams) {
+          if ($this->inQuery) {
+              return;
+          }
+
           $spanBuilder
             ->setSpanKind(SpanKind::KIND_CLIENT)
             ->setAttribute(TraceAttributes::DB_SYSTEM, 'mariadb')
@@ -43,6 +49,16 @@ class DatabaseInstrumentation extends InstrumentationBase {
             );
             $spanBuilder->setAttribute(self::DB_VARIABLES, $cleanVariables);
           }
+
+          $this->inQuery = TRUE;
+          try {
+            $explain_results = $connection->query('EXPLAIN ' . $namedParams['query'], $namedParams['args'] ?? [])->fetchAll();
+            $spanBuilder->setAttribute($this->getAttributeName('explain'), json_encode($explain_results));
+          }
+          catch (\Exception $e) {
+          }
+
+          $this->inQuery = FALSE;
         },
       ],
     ];
