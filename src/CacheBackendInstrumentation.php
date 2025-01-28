@@ -3,7 +3,7 @@ namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\Cache\CacheBackendInterface;
 
-class CacheBackendInstrumentation extends InstrumentationBase2 {
+class CacheBackendInstrumentation extends InstrumentationBase {
   protected const CLASSNAME = CacheBackendInterface::class;
   protected static array $cacheBins = [];
 

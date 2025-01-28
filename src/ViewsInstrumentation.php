@@ -8,7 +8,7 @@ use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\SemConv\TraceAttributes;
 use Drupal\views\ViewExecutable;
 
-class ViewsInstrumentation extends InstrumentationBase2 {
+class ViewsInstrumentation extends InstrumentationBase {
   protected const CLASSNAME = ViewExecutable::class;
 
   public static function register(): void {

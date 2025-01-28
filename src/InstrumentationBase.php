@@ -4,7 +4,7 @@ namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 require_once __DIR__ . '/../opentelemery-php-instrumentation-trait/src/InstrumentationTrait.php';
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
-abstract class InstrumentationBase2 {
+abstract class InstrumentationBase {
     use InstrumentationTrait {
       create as protected createClass;
     }
