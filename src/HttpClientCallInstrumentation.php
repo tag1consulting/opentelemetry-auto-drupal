@@ -38,7 +38,7 @@ class HttpClientCallInstrumentation extends InstrumentationBase {
           : ($url ?? 'unknown-http-client');
 
         $spanBuilder
-          ->setName($host)
+          ->setAttribute(static::UPDATE_NAME, $host)
           ->setSpanKind(SpanKind::KIND_CLIENT)
           ->setAttribute(TraceAttributes::HTTP_REQUEST_METHOD, $params[0])
           ->setAttribute(TraceAttributes::URL_FULL, $params[1])

@@ -42,7 +42,7 @@ class ViewsInstrumentation extends InstrumentationBase {
             $spanName .= ' ' . $name;
           }
 
-          $spanBuilder->setName($spanName);
+          $spanBuilder->setAttribute(static::UPDATE_NAME, $spanName);
           $spanBuilder->setAttribute($this->getAttributeName('name'), $name);
           $spanBuilder->setAttribute($this->getAttributeName('display_id'), $display_id);
         },

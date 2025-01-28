@@ -37,7 +37,7 @@ class HttpClientRequestInstrumentation extends InstrumentationBase {
             $host = parse_url($namedParams['uri'], PHP_URL_HOST);
           }
 
-          $spanBuilder->setName($host)
+          $spanBuilder->setAttribute(static::UPDATE_NAME, $host)
             ->setSpanKind(SpanKind::KIND_CLIENT)
             ->setAttribute(TraceAttributes::HTTP_REQUEST_METHOD, $namedParams['method'])
             ->setAttribute(TraceAttributes::URL_FULL, $namedParams['uri'])

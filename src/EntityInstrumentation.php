@@ -35,7 +35,7 @@ final class EntityInstrumentation extends InstrumentationBase {
           $entity = $namedParams['entity'];
           $span = sprintf('Entity save (%s:%s)', $entity->getEntityTypeId(), $entity->isNew() ? 'new' : $entity->id());
 
-          $spanBuilder->setName($span)
+          $spanBuilder->setAttribute(static::UPDATE_NAME, $span)
             ->setAttribute('entity.type', $entity->getEntityTypeId())
             ->setAttribute('entity.is_new', $entity->isNew())
             ->setAttribute('entity.id', $entity->id())
@@ -51,7 +51,7 @@ final class EntityInstrumentation extends InstrumentationBase {
             return;
           }
 
-          $spanBuilder->setName('Entity delete');
+          $spanBuilder->setAttribute(static::UPDATE_NAME, 'Entity delete');
 
           $entitiesGrouped = array_reduce($entities, function (array $carry, EntityInterface $entity) {
             $carry[$entity->getEntityTypeId()][] = $entity->id();
