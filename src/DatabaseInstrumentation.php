@@ -22,16 +22,16 @@ class DatabaseInstrumentation extends InstrumentationBase {
     $operations = [
       'query' => [
         'params' => [],
-        'preHandler' => function($spanBuilder, $object, array $params) {
+        'preHandler' => function($spanBuilder, $object, array $namedParams) {
           $spanBuilder
             ->setSpanKind(SpanKind::KIND_CLIENT)
             ->setAttribute(TraceAttributes::DB_SYSTEM, 'mariadb')
-            ->setAttribute(TraceAttributes::DB_STATEMENT, $params[0]);
+            ->setAttribute(TraceAttributes::DB_STATEMENT, $namedParams['query']);
 
-          if (isset($params[1]) === TRUE) {
+          if (isset($namedParams['args']) === TRUE) {
             $cleanVariables = array_map(
               static fn ($value) => is_array($value) ? json_encode($value) : (string) $value,
-              $params[1]
+              $namedParams['args']
             );
             $spanBuilder->setAttribute(self::DB_VARIABLES, $cleanVariables);
           }
