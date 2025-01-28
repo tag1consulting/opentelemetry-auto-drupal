@@ -38,7 +38,6 @@ final class EntityInstrumentation extends InstrumentationBase {
           $span = sprintf('Entity save (%s:%s)', $entity->getEntityTypeId(), $entity->isNew() ? 'new' : $entity->id());
 
           $spanBuilder->setName($span)
-            ->setSpanKind(SpanKind::KIND_INTERNAL)
             ->setAttribute('entity.type', $entity->getEntityTypeId())
             ->setAttribute('entity.is_new', $entity->isNew())
             ->setAttribute('entity.id', $entity->id())
@@ -54,8 +53,7 @@ final class EntityInstrumentation extends InstrumentationBase {
             return;
           }
 
-          $spanBuilder->setName('Entity delete')
-            ->setSpanKind(SpanKind::KIND_INTERNAL);
+          $spanBuilder->setName('Entity delete');
 
           $entitiesGrouped = array_reduce($entities, function (array $carry, EntityInterface $entity) {
             $carry[$entity->getEntityTypeId()][] = $entity->id();
@@ -71,18 +69,6 @@ final class EntityInstrumentation extends InstrumentationBase {
       ],
     ];
 
-    // Common handler to add code attributes.
-    $commonPreHandler = function ($spanBuilder, $object, array $params, string $class, string $function, ?string $filename, ?int $lineno) {
-      $spanBuilder->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
-        ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
-        ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
-        ->setAttribute(TraceAttributes::CODE_LINENO, $lineno);
-    };
-
-    $this->registerOperations(
-      operations: $operations,
-      commonPreHandler: $commonPreHandler
-    );
+    $this->registerOperations($operations);
   }
-
 }
