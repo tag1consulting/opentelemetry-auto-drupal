@@ -15,8 +15,8 @@ abstract class InstrumentationBase {
   /**
    * Creates and initializes the instrumentation.
    */
-  protected static function create(string $name, string $prefix, string $className): static {
-    $instance = static::createClass(name: $name, prefix: $prefix, className: $className);
+  protected static function create(...$args): static {
+    $instance = static::createClass(...$args);
     $instance->registerInstrumentation();
     return $instance;
   }
