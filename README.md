@@ -41,5 +41,11 @@ The extension can be disabled via runtime configuration:
 OTEL_PHP_DISABLED_INSTRUMENTATIONS=drupal
 ```
 
+### Query Explain Threshold Configuration
 
+The EXPLAIN threshold feature allows you to set a minimum duration threshold for capturing EXPLAIN results in your traces. When `OTEL_PHP_DRUPAL_EXPLAIN_QUERIES` is enabled, you can use `OTEL_PHP_DRUPAL_EXPLAIN_THRESHOLD` to specify the minimum query duration (in milliseconds) that should trigger EXPLAIN capture.
 
+For example:
+```
+OTEL_PHP_DRUPAL_EXPLAIN_THRESHOLD=100  # Capture EXPLAIN for queries taking longer than 100ms
+```
