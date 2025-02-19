@@ -3,57 +3,113 @@
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\Database\Connection;
-use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
 use OpenTelemetry\API\Trace\SpanKind;
-use OpenTelemetry\Context\Context;
 use OpenTelemetry\SemConv\TraceAttributes;
-use function \OpenTelemetry\Instrumentation\hook;
 
+/**
+ * Provides OpenTelemetry instrumentation for Drupal database operations.
+ */
 class DatabaseInstrumentation extends InstrumentationBase {
-
+  protected const CLASSNAME = Connection::class;
   public const DB_VARIABLES = 'db.variables';
 
+  /**
+   *
+   */
   public static function register(): void {
-
-    $instrumentation = new CachedInstrumentation('io.opentelemetry.contrib.php.drupal');
-
-    hook(
-      Connection::class,
-      'query',
-      static::preClosure($instrumentation),
-      static::postClosure()
+    static::create(
+      name: 'io.opentelemetry.contrib.php.drupal',
+      prefix: 'drupal.database',
+      className: static::CLASSNAME
     );
+  }
 
+  protected bool $inQuery = FALSE;
+
+  protected bool $explainQueries = FALSE;
+  /**
+   * Minimum duration threshold (in seconds) for capturing EXPLAIN results.
+   *
+   * When explainQueries is enabled, only queries that take longer than this
+   * threshold will have their EXPLAIN results captured in the span. This helps
+   * prevent unnecessary overhead for fast queries.
+   *
+   * Configure via OTEL_PHP_DRUPAL_EXPLAIN_THRESHOLD environment variable.
+   * Value should be in milliseconds, e.g.:
+   * OTEL_PHP_DRUPAL_EXPLAIN_THRESHOLD=100 // For 100ms threshold
+   *
+   * @var float Time in seconds (e.g., 0.1 for 100ms)
+   */
+  protected float $explainQueriesThreshold = 0.0;
+
+  /**
+   *
+   */
+  protected function registerInstrumentation(): void {
+
+    $this->explainQueries = getenv('OTEL_PHP_DRUPAL_EXPLAIN_QUERIES') ? TRUE : FALSE;
+    $this->explainQueriesThreshold = (float) (getenv('OTEL_PHP_DRUPAL_EXPLAIN_THRESHOLD') ?? 0) / 1000;
+
+    $operations = [
+      'query' => [
+        'preHandler' => function ($spanBuilder, Connection $connection, array $namedParams) {
+          if ($this->inQuery) {
+              return;
+          }
+
+          $spanBuilder
+            ->setSpanKind(SpanKind::KIND_CLIENT)
+            ->setAttribute(TraceAttributes::DB_SYSTEM, 'mariadb')
+            ->setAttribute(TraceAttributes::DB_STATEMENT, $namedParams['query']);
+
+          if (isset($namedParams['args']) === TRUE) {
+            $cleanVariables = array_map(
+              static fn ($value) => is_array($value) ? json_encode($value) : (string) $value,
+              $namedParams['args']
+            );
+            $spanBuilder->setAttribute(self::DB_VARIABLES, $cleanVariables);
+          }
+
+          if ($this->explainQueries) {
+            $this->captureQueryExplain(
+              $spanBuilder,
+              $connection,
+              $namedParams['query'],
+              $namedParams['args'] ?? []
+            );
+          }
+        },
+      ],
+    ];
+
+    $this->registerOperations($operations);
   }
 
   /**
-   * @param \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation
+   * Captures and adds EXPLAIN query results as attributes to the span builder.
    *
-   * @return \Closure
+   * This function executes an EXPLAIN query and adds the results as attributes
+   * to the span builder if the query execution time exceeds the configured threshold.
+   *
+   * @param mixed $spanBuilder The span builder instance
+   * @param \Drupal\Core\Database\Connection $connection Database connection
+   * @param string $query The SQL query to explain
+   * @param array $args Query arguments
    */
-  public static function preClosure(CachedInstrumentation $instrumentation): \Closure {
-    return static function (Connection $connection, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($instrumentation) {
-      $parent = Context::getCurrent();
+  protected function captureQueryExplain($spanBuilder, Connection $connection, string $query, array $args): void {
+    $this->inQuery = TRUE;
+    try {
+      $start = microtime(true);
+      $explain_results = $connection->query('EXPLAIN ' . $query, $args)->fetchAll();
+      $duration = microtime(true) - $start;
 
-      /** @var \OpenTelemetry\API\Trace\SpanBuilderInterface $span */
-      $span = $instrumentation->tracer()->spanBuilder('database::query')
-        ->setParent($parent)
-        ->setSpanKind(SpanKind::KIND_CLIENT)
-        ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
-        ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
-        ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
-        ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
-        ->setAttribute(TraceAttributes::DB_SYSTEM, 'mariadb')
-        ->setAttribute(TraceAttributes::DB_STATEMENT, $params[0]);
-      if (isset($params[1]) === TRUE) {
-        $cleanVariables = array_map(static fn ($value) => is_array($value) ? json_encode($value) : (string) $value, $params[1]);
-        $span->setAttribute(self::DB_VARIABLES, $cleanVariables);
+      if ($duration >= $this->explainQueriesThreshold) {
+        $spanBuilder->setAttribute($this->getAttributeName('explain'), json_encode($explain_results));
       }
-      $span = $span->startSpan();
-
-      Context::storage()
-        ->attach($span->storeInContext($parent));
-    };
+    }
+    catch (\Exception $e) {
+    }
+    $this->inQuery = FALSE;
   }
 
 }

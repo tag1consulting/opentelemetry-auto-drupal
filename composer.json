@@ -8,7 +8,8 @@
         "open-telemetry/sdk": "^1",
         "open-telemetry/sem-conv": "^1.23",
         "symfony/http-client": "6.4.x-dev",
-        "nyholm/psr7": "^1.8@dev"
+        "nyholm/psr7": "^1.8@dev",
+        "performance-x/opentelemetry-php-instrumentation-trait": "^1.1.1"
     },
     "license": "Apache-2.0",
     "minimum-stability": "dev",

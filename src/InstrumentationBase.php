@@ -2,53 +2,163 @@
 
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
-use Drupal\redis\Cache\CacheBase;
-use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
-use OpenTelemetry\API\Trace\Span;
-use OpenTelemetry\API\Trace\SpanInterface;
-use OpenTelemetry\API\Trace\SpanKind;
-use OpenTelemetry\API\Trace\StatusCode;
-use OpenTelemetry\Context\Context;
-use OpenTelemetry\SemConv\TraceAttributes;
-use Throwable;
+use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
+/**
+ *
+ */
 abstract class InstrumentationBase {
+  use InstrumentationTrait {
+    create as protected createClass;
+  }
 
-  public const NAME = 'drupal';
+  /**
+   * Creates and initializes the instrumentation.
+   */
+  protected static function create(...$args): static {
+    $instance = static::createClass(...$args);
+    $instance->registerInstrumentation();
+    return $instance;
+  }
 
-  abstract public static function register(): void;
+  /**
+   * Register the specific instrumentation logic.
+   */
+  abstract protected function registerInstrumentation(): void;
 
-  public static function preClosure(CachedInstrumentation $instrumentation): \Closure {
-    return static function (CacheBase $cacheBase, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($instrumentation) {
-      $span = $instrumentation->tracer()->spanBuilder('cache_backend::get')
-        ->setSpanKind(SpanKind::KIND_CLIENT)
-        ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
-        ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
-        ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
-        ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
-        ->setAttribute(TraceAttributes::DB_SYSTEM, 'redis')
-        ->setAttribute('cache.key', $params[0])
-        ->startSpan();
-      Context::storage()
-        ->attach($span->storeInContext(Context::getCurrent()));
+  /**
+   * Resolves parameter information for a given method using reflection.
+   *
+   * This helper function creates a mapping between parameter names and their positions
+   * in the method signature. This is crucial for converting positional arguments
+   * to named parameters later in the instrumentation process.
+   *
+   * @param string $className
+   *   The fully qualified class name.
+   * @param string $methodName
+   *   The method name to analyze.
+   *
+   * @return array<string, int> Map of parameter names to their positions
+   *   Example: ['cid' => 0, 'data' => 1, 'expire' => 2].
+   *
+   * @throws \ReflectionException If the method does not exist
+   */
+  protected static function resolveMethodParameters(string $className, string $methodName): array {
+    $reflMethod = new \ReflectionMethod($className, $methodName);
+    $parameterPositions = [];
+    foreach ($reflMethod->getParameters() as $position => $parameter) {
+      $parameterPositions[$parameter->getName()] = $position;
+    }
+    return $parameterPositions;
+  }
+
+  /**
+   * Creates a converter function that transforms positional parameters to named parameters.
+   *
+   * This helper creates a closure that can convert an array of positional arguments
+   * into an associative array that maintains both numeric indexes and named parameters.
+   * This allows for flexible parameter access either by position or name.
+   *
+   * Example:
+   * Input: [0 => 'value1', 1 => 'value2']
+   * Parameter positions: ['name1' => 0, 'name2' => 1]
+   * Output: [0 => 'value1', 1 => 'value2', 'name1' => 'value1', 'name2' => 'value2']
+   *
+   * @param array<string, int> $parameterPositions
+   *   Parameter name to position mapping.
+   *
+   * @return callable Function that converts positional to named parameters while preserving numeric indexes
+   *   Signature: function(array $params): array.
+   */
+  protected static function createNamedParamsConverter(array $parameterPositions): callable {
+    return function (array $params) use ($parameterPositions): array {
+      $namedParams = $params;
+      foreach ($parameterPositions as $name => $position) {
+        if (isset($params[$position])) {
+          $namedParams[$name] = $params[$position];
+        }
+      }
+      return $namedParams;
     };
   }
 
-  public static function postClosure(): \Closure {
-    return static function (mixed $base, array $params, $returnValue, ?Throwable $exception) {
-      $scope = Context::storage()->scope();
-      if (!$scope) {
-        return;
-      }
-      $scope->detach();
-      $span = Span::fromContext($scope->context());
-      if ($exception) {
-        $span->recordException($exception, [TraceAttributes::EXCEPTION_ESCAPED => TRUE]);
-        $span->setStatus(StatusCode::STATUS_ERROR, $exception->getMessage());
-      }
+  /**
+   * Creates a wrapped handler that combines common and specific handling logic.
+   *
+   * @param callable $converter
+   *   Parameter converter function.
+   * @param callable|null $handler
+   *   Specific handling logic.
+   * @param callable $allHandler
+   *   Common handling logic.
+   *
+   * @return callable Combined handler.
+   */
+  protected static function wrapHandler(callable $converter, ?callable $handler, callable $allHandler): callable {
+    return function (...$args) use ($converter, $handler, $allHandler) {
+      $params = $converter($args[2]);
 
-      $span->end();
+      $allHandler(...$args);
+      if ($handler) {
+        $args[2] = $params;
+        $handler(...$args);
+      }
     };
+  }
+
+  /**
+   * Registers multiple operations with common handling logic.
+   *
+   * @param array $operations
+   *   Array of operation configurations
+   *   [
+   *                           'methodName' => [
+   *                             'params' => ['paramName' => 'attributeName'],
+   *                             'preHandler' => callable,
+   *                             'postHandler' => callable,
+   *                             'returnValue' => string|null
+   *                           ]
+   *                         ].
+   * @param callable|null $commonPreHandler
+   *   Handler applied before all operations.
+   * @param callable|null $commonPostHandler
+   *   Handler applied after all operations.
+   *
+   * @return this
+   */
+  protected function registerOperations(
+        array $operations,
+        ?callable $commonPreHandler = NULL,
+        ?callable $commonPostHandler = NULL
+    ): self {
+    foreach ($operations as $method => $config) {
+      $parameterPositions = static::resolveMethodParameters($this->className, $method);
+      $converter = static::createNamedParamsConverter($parameterPositions);
+
+      $preHandler = isset($config['preHandler']) || $commonPreHandler ?
+              static::wrapHandler(
+                $converter,
+                $config['preHandler'] ?? NULL,
+                $commonPreHandler ?? function () {}
+            ) : NULL;
+
+      $postHandler = isset($config['postHandler']) || $commonPostHandler ?
+              static::wrapHandler(
+                $converter,
+                $config['postHandler'] ?? NULL,
+                $commonPostHandler ?? function () {}
+            ) : NULL;
+
+      $this->helperHook(
+            methodName: $method,
+            paramMap: $config['params'] ?? [],
+            returnValueKey: $config['returnValue'] ?? NULL,
+            preHandler: $preHandler,
+            postHandler: $postHandler
+        );
+    }
+
+    return $this;
   }
 
 }
