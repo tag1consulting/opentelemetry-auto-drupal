@@ -1,5 +1,5 @@
 {
-    "name": "tag1consulting/opentelemetry-auto-drupal",
+    "name": "performance-x/opentelemetry-auto-drupal",
     "description": "OpenTelemetry auto-instrumentation for Drupal",
     "type": "library",
     "require": {
