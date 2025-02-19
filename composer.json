@@ -1,5 +1,5 @@
 {
-    "name": "mladenrtl/opentelemetry-auto-drupal",
+    "name": "tag1consulting/opentelemetry-auto-drupal",
     "description": "OpenTelemetry auto-instrumentation for Drupal",
     "type": "library",
     "require": {
